@@ -15,13 +15,20 @@ class GameController extends Controller
         $difficulty = $request->session()->get('difficulty', 'hard');
         $board = $request->session()->get('board', array_fill(0, 9, ' '));
         $finished = $request->session()->get('finished', false);
+        $currentPlayer = $request->session()->get('currentPlayer', 'X'); // ← ВОТ ЭТО
 
         $result = TicTacToe::analyze($board);
         $winner = $result['winner'];
         $winningLine = $result['line'];
 
         return view('game', compact(
-            'board', 'mode', 'difficulty', 'finished', 'winner', 'winningLine'
+            'board',
+            'mode',
+            'difficulty',
+            'finished',
+            'winner',
+            'winningLine',
+            'currentPlayer'
         ));
     }
 
@@ -36,36 +43,48 @@ class GameController extends Controller
         $analysis = $request->session()->get('analysis', []);
         $finished = $request->session()->get('finished', false);
 
-        // Играем только если клетка свободна и партия не закончена
-        if (!$finished && $board[$cell] === ' ') {
-            $board[$cell] = 'X';
-            $moves[] = "X:$cell";
+        $currentPlayer = $request->session()->get('currentPlayer', 'X');
 
-            // Оценка позиции после хода игрока — пригодится для разбора
-            $analysis[] = [
-                'move' => $cell,
-                'eval' => TicTacToe::evaluateForX($board),
-            ];
+        if (!$finished && $board[$cell] === ' ') {
+
+            // === Ход текущего игрока ===
+            $board[$cell] = $currentPlayer;
+            $moves[] = "{$currentPlayer}:{$cell}";
+
+            if ($currentPlayer === 'X') {
+                $analysis[] = [
+                    'move' => $cell,
+                    'eval' => TicTacToe::evaluateForX($board),
+                ];
+            }
 
             $result = TicTacToe::analyze($board);
             $winner = $result['winner'];
 
-            // Ход компьютера, если режим ИИ и игра не окончена
-            if ($winner === null && $mode === 'ai') {
+            // === Ход компьютера — ТОЛЬКО если сейчас был ход игрока X ===
+            if ($winner === null && $mode === 'ai' && $currentPlayer === 'X') {
                 $ai = TicTacToe::aiMove($board, $difficulty);
                 $board[$ai] = 'O';
                 $moves[] = "O:$ai";
 
                 $result = TicTacToe::analyze($board);
                 $winner = $result['winner'];
+                // currentPlayer остаётся 'X' — следующий ход снова игрока
             }
 
+            // === PvP — переключаем игрока ===
+            if ($winner === null && $mode === 'pvp') {
+                $currentPlayer = $currentPlayer === 'X' ? 'O' : 'X';
+                $request->session()->put('currentPlayer', $currentPlayer);
+            }
+
+            // === Финал ===
             if ($winner !== null) {
                 $finished = true;
                 Game::create([
                     'winner' => $winner,
-                    'mode'   => $mode,
-                    'moves'  => $moves,
+                    'mode' => $mode,
+                    'moves' => $moves,
                     'analysis' => $analysis,
                 ]);
             }
@@ -79,7 +98,7 @@ class GameController extends Controller
     /** Новая игра */
     public function reset(Request $request)
     {
-        $request->session()->forget(['board', 'moves', 'analysis', 'finished']);
+        $request->session()->forget(['board', 'moves', 'analysis', 'finished', 'currentPlayer']);
         return redirect()->route('game');
     }
 
@@ -87,7 +106,7 @@ class GameController extends Controller
     public function mode(Request $request, string $mode)
     {
         $request->session()->put('mode', $mode);
-        $request->session()->forget(['board', 'moves', 'analysis', 'finished']);
+        $request->session()->forget(['board', 'moves', 'analysis', 'finished', 'currentPlayer']);
         return redirect()->route('game');
     }
 
@@ -124,8 +143,8 @@ class GameController extends Controller
     {
         $raw = Game::selectRaw('winner, COUNT(*) as c')->groupBy('winner')->pluck('c', 'winner');
         $stats = [
-            'X'    => $raw['X'] ?? 0,
-            'O'    => $raw['O'] ?? 0,
+            'X' => $raw['X'] ?? 0,
+            'O' => $raw['O'] ?? 0,
             'draw' => $raw['draw'] ?? 0,
         ];
         $stats['total'] = array_sum($stats);
