@@ -4,48 +4,123 @@ namespace App\Services;
 
 class TicTacToe
 {
-    /** Проверка победителя. Возврат 'X', 'O', 'draw' или null. */
-    public static function checkWinner(array $b): ?string
+    /** Все победные линии */
+    private const LINES = [
+        [0, 1, 2],
+        [3, 4, 5],
+        [6, 7, 8],
+        [0, 3, 6],
+        [1, 4, 7],
+        [2, 5, 8],
+        [0, 4, 8],
+        [2, 4, 6],
+    ];
+
+    /**
+     * Анализ позиции: кто победил и какая линия.
+     * Возвращает ['winner' => 'X'|'O'|'draw'|null, 'line' => [0,1,2]|[]]
+     */
+    public static function analyze(array $b): array
     {
-        $lines = [
-            [0,1,2],[3,4,5],[6,7,8],
-            [0,3,6],[1,4,7],[2,5,8],
-            [0,4,8],[2,4,6],
-        ];
-        foreach ($lines as [$a,$c,$d]) {
+        foreach (self::LINES as $line) {
+            [$a, $c, $d] = $line;
             if ($b[$a] !== ' ' && $b[$a] === $b[$c] && $b[$a] === $b[$d]) {
-                return $b[$a];
+                return ['winner' => $b[$a], 'line' => $line];
             }
         }
-        return in_array(' ', $b) ? null : 'draw';
+        return [
+            'winner' => in_array(' ', $b) ? null : 'draw',
+            'line' => [],
+        ];
     }
 
-    /** Ход компьютера: сначала выиграть, потом блокировать, потом центр/угол/рандом. */
-    public static function aiMove(array $b): int
+    /** Обёртки для обратной совместимости — на случай, если где-то ещё вызывается checkWinner */
+    public static function checkWinner(array $b): ?string
     {
-        // 1. Может выиграть?
-        foreach (self::emptyCells($b) as $i) {
-            $t = $b; $t[$i] = 'O';
-            if (self::checkWinner($t) === 'O') return $i;
-        }
-        // 2. Нужно блокировать?
-        foreach (self::emptyCells($b) as $i) {
-            $t = $b; $t[$i] = 'X';
-            if (self::checkWinner($t) === 'X') return $i;
-        }
-        // 3. Центр
-        if ($b[4] === ' ') return 4;
-        // 4. Углы
-        $corners = [0, 2, 6, 8];
-        $freeCorners = array_filter($corners, fn($i) => $b[$i] === ' ');
-        if ($freeCorners) return $freeCorners[array_rand($freeCorners)];
-        // 5. Что осталось
-        $free = self::emptyCells($b);
-        return $free[array_rand($free)];
+        return self::analyze($b)['winner'];
     }
 
+    /** Свободные клетки */
     public static function emptyCells(array $b): array
     {
         return array_keys(array_filter($b, fn($c) => $c === ' '));
+    }
+
+    /**
+     * Минимакс с альфа-бета отсечением.
+     * Возвращает ['score' => int, 'move' => int].
+     * Оценка: +10 — выигрывает O, -10 — выигрывает X, 0 — ничья.
+     */
+    public static function minimax(array $b, string $player, $alpha = -INF, $beta = INF): array
+    {
+        $result = self::analyze($b);
+
+        if ($result['winner'] === 'O')
+            return ['score' => 10, 'move' => -1];
+        if ($result['winner'] === 'X')
+            return ['score' => -10, 'move' => -1];
+        if ($result['winner'] === 'draw')
+            return ['score' => 0, 'move' => -1];
+
+        $best = ['score' => $player === 'O' ? -INF : INF, 'move' => -1];
+
+        foreach (self::emptyCells($b) as $i) {
+            $b[$i] = $player;
+            $res = self::minimax($b, $player === 'O' ? 'X' : 'O', $alpha, $beta);
+            $b[$i] = ' ';
+
+            if ($player === 'O') {
+                if ($res['score'] > $best['score']) {
+                    $best = ['score' => $res['score'], 'move' => $i];
+                }
+                $alpha = max($alpha, $best['score']);
+            } else {
+                if ($res['score'] < $best['score']) {
+                    $best = ['score' => $res['score'], 'move' => $i];
+                }
+                $beta = min($beta, $best['score']);
+            }
+
+            if ($beta <= $alpha)
+                break; // альфа-бета отсечение
+        }
+
+        return $best;
+    }
+
+    /**
+     * Ход компьютера с учётом уровня сложности.
+     * Уровни: 'easy', 'medium', 'hard'.
+     */
+    public static function aiMove(array $b, string $difficulty = 'hard'): int
+    {
+        $free = self::emptyCells($b);
+        if (empty($free))
+            return -1;
+
+        // Easy — чистый рандом
+        if ($difficulty === 'easy') {
+            return $free[array_rand($free)];
+        }
+
+        // Medium — 50/50 между рандомом и минимаксом
+        if ($difficulty === 'medium') {
+            if (random_int(0, 1) === 0) {
+                return $free[array_rand($free)];
+            }
+        }
+
+        // Hard (и вторая половина medium) — минимакс
+        return self::minimax($b, 'O')['move'];
+    }
+
+    /**
+     * Оценка позиции для игрока X.
+     * Используется для "разбора партии" — понять, был ли ход игрока оптимальным.
+     * +10 — X выиграет при идеальной игре, -10 — проиграет, 0 — ничья.
+     */
+    public static function evaluateForX(array $b): int
+    {
+        return (int) self::minimax($b, 'X')['score'];
     }
 }

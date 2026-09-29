@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Game extends Model
 {
-    protected $fillable = ['winner', 'mode', 'moves'];
-    protected $casts = ['moves' => 'array'];
+    protected $fillable = ['winner', 'mode', 'moves', 'analysis'];
+    protected $casts = ['moves' => 'array', 'analysis' => 'array'];
+
 }

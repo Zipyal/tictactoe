@@ -7,6 +7,8 @@ Route::get('/', [GameController::class, 'index'])->name('game');
 Route::post('/move', [GameController::class, 'move'])->name('move');
 Route::post('/reset', [GameController::class, 'reset'])->name('reset');
 Route::get('/mode/{mode}', [GameController::class, 'mode'])->name('mode');
+Route::get('/difficulty/{level}', [GameController::class, 'difficulty'])->name('difficulty');
+Route::post('/hint', [GameController::class, 'hint'])->name('hint');
 Route::get('/history', [GameController::class, 'history'])->name('history');
 Route::get('/history/{game}', [GameController::class, 'replay'])->name('replay');
 Route::get('/stats', [GameController::class, 'stats'])->name('stats');

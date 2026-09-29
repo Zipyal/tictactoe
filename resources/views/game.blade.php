@@ -54,3 +54,18 @@
     </form>
 </div>
 @endsection
+
+<style>
+    @keyframes pop-in {
+        0%   { transform: scale(0) rotate(-45deg); opacity: 0; }
+        60%  { transform: scale(1.15) rotate(5deg); opacity: 1; }
+        100% { transform: scale(1) rotate(0); }
+    }
+    .cell-pop { animation: pop-in 0.25s ease-out; }
+
+    @keyframes pulse-win {
+        0%, 100% { background-color: rgba(74, 222, 128, 0.2); }
+        50%      { background-color: rgba(74, 222, 128, 0.5); }
+    }
+    .cell-win { animation: pulse-win 1s ease-in-out infinite; }
+</style>
