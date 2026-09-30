@@ -126,16 +126,23 @@ class GameController extends Controller
     }
 
     /** История партий */
-    public function history()
+    public function history(Request $request)
     {
-        $games = Game::latest()->paginate(10);
-        return view('history', compact('games'));
-    }
+        $query = Game::query();
 
-    /** Реплей партии */
-    public function replay(Game $game)
-    {
-        return view('replay', compact('game'));
+        // Фильтр по режиму
+        if ($mode = $request->input('mode')) {
+            $query->where('mode', $mode);
+        }
+
+        // Фильтр по результату
+        if ($winner = $request->input('winner')) {
+            $query->where('winner', $winner);
+        }
+
+        $games = $query->latest()->paginate(10)->withQueryString();
+
+        return view('history', compact('games'));
     }
 
     /** Статистика */
