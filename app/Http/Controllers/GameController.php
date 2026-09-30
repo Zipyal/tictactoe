@@ -145,16 +145,39 @@ class GameController extends Controller
         return view('history', compact('games'));
     }
 
+        /** Реплей партии */
+    public function replay(Game $game)
+    {
+        $analysis = $game->analysis ?? [];
+        $analysis = TicTacToe::annotateAnalysis($analysis);
+        return view('replay', compact('game', 'analysis'));
+    }
+
     /** Статистика */
     public function stats()
     {
         $raw = Game::selectRaw('winner, COUNT(*) as c')->groupBy('winner')->pluck('c', 'winner');
+
         $stats = [
             'X' => $raw['X'] ?? 0,
             'O' => $raw['O'] ?? 0,
             'draw' => $raw['draw'] ?? 0,
         ];
         $stats['total'] = array_sum($stats);
+
+        // Проценты
+        $stats['win_rate'] = $stats['total'] ? round($stats['X'] / $stats['total'] * 100, 1) : 0;
+        $stats['lose_rate'] = $stats['total'] ? round($stats['O'] / $stats['total'] * 100, 1) : 0;
+        $stats['draw_rate'] = $stats['total'] ? round($stats['draw'] / $stats['total'] * 100, 1) : 0;
+
+        // Средняя длина партии
+        $stats['avg_moves'] = $stats['total']
+            ? round(Game::all()->avg(fn($g) => count($g->moves)), 1)
+            : 0;
+
+        // Последняя партия
+        $stats['last_game'] = Game::latest()->first();
+
         return view('stats', compact('stats'));
     }
 }

@@ -16,10 +16,6 @@ class TicTacToe
         [2, 4, 6],
     ];
 
-    /**
-     * Анализ позиции: кто победил и какая линия.
-     * Возвращает ['winner' => 'X'|'O'|'draw'|null, 'line' => [0,1,2]|[]]
-     */
     public static function analyze(array $b): array
     {
         foreach (self::LINES as $line) {
@@ -34,33 +30,23 @@ class TicTacToe
         ];
     }
 
-    /** Обёртки для обратной совместимости — на случай, если где-то ещё вызывается checkWinner */
     public static function checkWinner(array $b): ?string
     {
         return self::analyze($b)['winner'];
     }
 
-    /** Свободные клетки */
     public static function emptyCells(array $b): array
     {
         return array_keys(array_filter($b, fn($c) => $c === ' '));
     }
 
-    /**
-     * Минимакс с альфа-бета отсечением.
-     * Возвращает ['score' => int, 'move' => int].
-     * Оценка: +10 — выигрывает O, -10 — выигрывает X, 0 — ничья.
-     */
     public static function minimax(array $b, string $player, $alpha = -INF, $beta = INF): array
     {
         $result = self::analyze($b);
 
-        if ($result['winner'] === 'O')
-            return ['score' => 10, 'move' => -1];
-        if ($result['winner'] === 'X')
-            return ['score' => -10, 'move' => -1];
-        if ($result['winner'] === 'draw')
-            return ['score' => 0, 'move' => -1];
+        if ($result['winner'] === 'O') return ['score' => 10, 'move' => -1];
+        if ($result['winner'] === 'X') return ['score' => -10, 'move' => -1];
+        if ($result['winner'] === 'draw') return ['score' => 0, 'move' => -1];
 
         $best = ['score' => $player === 'O' ? -INF : INF, 'move' => -1];
 
@@ -81,46 +67,52 @@ class TicTacToe
                 $beta = min($beta, $best['score']);
             }
 
-            if ($beta <= $alpha)
-                break; // альфа-бета отсечение
+            if ($beta <= $alpha) break;
         }
 
         return $best;
     }
 
-    /**
-     * Ход компьютера с учётом уровня сложности.
-     * Уровни: 'easy', 'medium', 'hard'.
-     */
     public static function aiMove(array $b, string $difficulty = 'hard'): int
     {
         $free = self::emptyCells($b);
-        if (empty($free))
-            return -1;
+        if (empty($free)) return -1;
 
-        // Easy — чистый рандом
         if ($difficulty === 'easy') {
             return $free[array_rand($free)];
         }
 
-        // Medium — 50/50 между рандомом и минимаксом
         if ($difficulty === 'medium') {
             if (random_int(0, 1) === 0) {
                 return $free[array_rand($free)];
             }
         }
 
-        // Hard (и вторая половина medium) — минимакс
         return self::minimax($b, 'O')['move'];
     }
 
-    /**
-     * Оценка позиции для игрока X.
-     * Используется для "разбора партии" — понять, был ли ход игрока оптимальным.
-     * +10 — X выиграет при идеальной игре, -10 — проиграет, 0 — ничья.
-     */
     public static function evaluateForX(array $b): int
     {
         return (int) self::minimax($b, 'X')['score'];
+    }
+
+    /**
+     * Аннотирует анализ партии: помечает ходы игрока как хорошие/ошибки.
+     */
+    public static function annotateAnalysis(array $analysis): array
+    {
+        $prevEval = null;
+        foreach ($analysis as &$item) {
+            if ($prevEval === null) {
+                $item['good'] = true;
+                $prevEval = $item['eval'];
+                continue;
+            }
+            $item['good'] = $item['eval'] >= $prevEval - 1;
+            $prevEval = $item['eval'];
+        }
+        unset($item);
+
+        return $analysis;
     }
 }
